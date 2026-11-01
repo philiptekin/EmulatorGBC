@@ -1,53 +1,56 @@
 #include <gtest/gtest.h>
+#include <stdint.h>
+
+#include <stdexcept>
 
 #include "core/memory/Vram.h"
 
-using namespace core::memory;
+using core::memory::Vram;
 
-TEST(VramTest, ReadByte_ValidAddress_ReturnsCorrectValue) {
+TEST(VramTest, ReadByteValidAddressReturnsWrittenValue) {
   Vram vram;
 
   // Write a value to VRAM
-  uint16_t address = Vram::StartAddress_;
-  std::uint8_t expectedValue = 42;
+  const uint16_t address = Vram::kStartAddress;
+  const uint8_t expectedValue = 42;
   vram.WriteByte(address, expectedValue);
 
   // Read the value back
-  std::uint8_t actualValue = vram.ReadByte(address);
+  const uint8_t actualValue = vram.ReadByte(address);
 
   EXPECT_EQ(expectedValue, actualValue);
 }
 
-TEST(VramTest, ReadByte_InvalidAddress_ThrowsOutOfRange) {
+TEST(VramTest, ReadByteInvalidAddressThrowsOutOfRange) {
   Vram vram;
 
   // Test reading from an address below the valid range
-  uint16_t invalidAddressLow = Vram::StartAddress_ - 1;
+  const uint16_t invalidAddressLow = Vram::kStartAddress - 1;
   EXPECT_THROW(vram.ReadByte(invalidAddressLow), std::out_of_range);
 
   // Test reading from an address above the valid range
-  uint16_t invalidAddressHigh = Vram::StartAddress_ + Vram::Size_;
+  const uint16_t invalidAddressHigh = Vram::kStartAddress + Vram::kSize;
   EXPECT_THROW(vram.ReadByte(invalidAddressHigh), std::out_of_range);
 }
 
-TEST(VramTest, ReadByte_EmptyVram_ReturnsZero) {
+TEST(VramTest, ReadByteFromUninitializedMemoryReturnsZero) {
   Vram vram;
 
   // Read from an address in VRAM without writing any value
-  uint16_t address = Vram::StartAddress_;
-  std::uint8_t actualValue = vram.ReadByte(address);
+  const uint16_t address = Vram::kStartAddress;
+  const uint8_t actualValue = vram.ReadByte(address);
 
   EXPECT_EQ(0, actualValue);
 }
 
-TEST(VramTest, WriteByte_InvalidAddress_ThrowsOutOfRange) {
+TEST(VramTest, WriteByteInvalidAddressThrowsOutOfRange) {
   Vram vram;
 
   // Test writing to an address below the valid range
-  uint16_t invalidAddressLow = Vram::StartAddress_ - 1;
+  const uint16_t invalidAddressLow = Vram::kStartAddress - 1;
   EXPECT_THROW(vram.WriteByte(invalidAddressLow, 42), std::out_of_range);
 
   // Test writing to an address above the valid range
-  uint16_t invalidAddressHigh = Vram::StartAddress_ + Vram::Size_;
+  const uint16_t invalidAddressHigh = Vram::kStartAddress + Vram::kSize;
   EXPECT_THROW(vram.WriteByte(invalidAddressHigh, 42), std::out_of_range);
 }

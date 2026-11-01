@@ -55,7 +55,7 @@ target_link_libraries(EmulatorGBC
         gameboy_core
 )
 
-if (BUILD_TESTING)
+if(BUILD_TESTING)
     include(FetchContent)
 
     fetchcontent_declare(

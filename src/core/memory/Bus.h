@@ -13,7 +13,7 @@ class Bus {
  public:
   Bus();
 
-  std::uint8_t Read(uint16_t address);
+  std::uint8_t Read(uint16_t address) const;
   void Write(uint16_t address, std::uint8_t value);
 
  private:
