@@ -1,0 +1,35 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="fEP07ZPJctLz6k_X_AIh">
+    <mxGraphModel dx="2881" dy="2306" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ntqP9PCWRNTI9V4I-1gw-9" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="EmulatorGBC" vertex="1">
+          <mxGeometry height="680" width="1260" x="-790" y="-170" as="geometry">
+            <mxRectangle height="30" width="120" x="-790" y="-170" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ntqP9PCWRNTI9V4I-1gw-10" edge="1" parent="ntqP9PCWRNTI9V4I-1gw-9" source="ntqP9PCWRNTI9V4I-1gw-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="ntqP9PCWRNTI9V4I-1gw-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ntqP9PCWRNTI9V4I-1gw-11" connectable="0" parent="ntqP9PCWRNTI9V4I-1gw-10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Access memory" vertex="1">
+          <mxGeometry relative="1" x="-0.1172" y="-1" as="geometry">
+            <mxPoint x="51" y="17" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ntqP9PCWRNTI9V4I-1gw-4" parent="ntqP9PCWRNTI9V4I-1gw-9" style="rounded=0;whiteSpace=wrap;html=1;align=center;" value="CPU&lt;div&gt;[Container]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="150" width="300" x="20" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ntqP9PCWRNTI9V4I-1gw-5" parent="ntqP9PCWRNTI9V4I-1gw-9" style="rounded=0;whiteSpace=wrap;html=1;align=center;" value="Memory&lt;div&gt;[Container]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="150" width="300" x="20" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="ntqP9PCWRNTI9V4I-1gw-6" parent="ntqP9PCWRNTI9V4I-1gw-9" style="rounded=0;whiteSpace=wrap;html=1;align=center;" value="PPU&lt;div&gt;[Container]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="150" width="300" x="940" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="ntqP9PCWRNTI9V4I-1gw-7" parent="ntqP9PCWRNTI9V4I-1gw-9" style="rounded=0;whiteSpace=wrap;html=1;align=center;" value="Cartridge&lt;div&gt;[Container]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="150" width="300" x="940" y="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

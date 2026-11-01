@@ -6,16 +6,16 @@ using namespace core::memory;
 
 Wram::Wram() { data_.fill(0); }
 
-std::uint8_t Wram::ReadByte(uint16_t address) {
-  if (address < StartAddress_ || address >= StartAddress_ + Size_) {
+std::uint8_t Wram::ReadByte(uint16_t address) const {
+  if (address < kStartAddress || address >= kStartAddress + kSize) {
     throw std::out_of_range("Address out of WRAM range");
   }
-  return data_[address - StartAddress_];
+  return data_[address - kStartAddress];
 }
 
 void Wram::WriteByte(uint16_t address, std::uint8_t value) {
-  if (address < StartAddress_ || address >= StartAddress_ + Size_) {
+  if (address < kStartAddress || address >= kStartAddress + kSize) {
     throw std::out_of_range("Address out of WRAM range");
   }
-  data_[address - StartAddress_] = value;
+  data_[address - kStartAddress] = value;
 }
