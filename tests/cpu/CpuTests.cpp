@@ -55,6 +55,17 @@ constexpr uint8_t kJrZ = 0x28;
 constexpr uint8_t kJrNc = 0x30;
 constexpr uint8_t kJrC = 0x38;
 
+// Block 1
+constexpr uint8_t kHalt = 0x76;
+constexpr uint8_t kLoadBIntoB = 0x40;
+constexpr uint8_t kLoadHLIntoB = 0x46;
+
+// Block 2
+constexpr uint8_t kAddBToA = 0x80;
+constexpr uint8_t kAddAddressInHLToA = 0x86;
+constexpr uint8_t kSubBToA = 0x90;
+constexpr uint8_t kSubAddressInHLToA = 0x96;
+
 }  // namespace
 
 class CpuTest : public ::testing::Test {
@@ -640,4 +651,267 @@ TEST_F(CpuTest, JrWrapsProgramCounterAtSixteenBitBoundary) {
 
   EXPECT_EQ(12, cpu.Step());
   EXPECT_EQ(0x0000, cpu.GetRegisters().PC);
+}
+
+// Block 1
+
+TEST_F(CpuTest, Halt) {
+  LoadProgram({kHalt});
+  Cpu cpu = MakeCpu(DefaultRegisters());
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+}
+
+TEST_F(CpuTest, LoadBIntoB) {
+  LoadProgram({kLoadBIntoB});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0x5U;
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(0x5U, cpu.GetRegisters().B);
+}
+
+TEST_F(CpuTest, LoadHLIntoB) {
+  LoadProgram({kLoadHLIntoB, 0x10});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0x5U;
+  initials.SetHL(kProgramStart + 1);
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(8, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(0x10U, cpu.GetRegisters().B);
+  EXPECT_EQ(0x10U, bus_.Read(cpu.GetRegisters().GetHL()));
+  EXPECT_EQ(cpu.GetRegisters().GetHL(), kProgramStart + 1);
+}
+
+// Block 2
+
+TEST_F(CpuTest, AddBToA) {
+  LoadProgram({kAddBToA});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0x10U;
+  initials.A = 0x05U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(true);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x15U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, AddBToAHalfFlag) {
+  LoadProgram({kAddBToA});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0xFU;
+  initials.A = 0x01U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(true);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x10U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, AddBToACarryFlag) {
+  LoadProgram({kAddBToA});
+
+  Registers initials = DefaultRegisters();
+  // 0b1000 0000
+  // 0b1000 0000
+  // result:
+  // 0b0000 0000
+  initials.B = 0x80U;
+  initials.A = 0x80U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(true);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x0U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, AddBToACarryFlagAndHalfFlag) {
+  LoadProgram({kAddBToA});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0xFFU;
+  initials.A = 0x01U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(true);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x0U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, AddAddressInHLToA) {
+  LoadProgram({kAddAddressInHLToA, 0x10});
+
+  Registers initials = DefaultRegisters();
+  initials.SetHL(kProgramStart + 1);
+  initials.A = 0x01U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(true);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(8, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x11U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, SubBToA) {
+  LoadProgram({kSubBToA});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0x10U;
+  initials.A = 0x11U;
+  initials.SetFlagH(true);
+  initials.SetFlagC(true);
+  initials.SetFlagN(false);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x01U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, SubBToAZFlag) {
+  LoadProgram({kSubBToA});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0x11U;
+  initials.A = 0x11U;
+  initials.SetFlagH(true);
+  initials.SetFlagC(true);
+  initials.SetFlagN(false);
+  initials.SetFlagZ(false);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x00U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, SubBToAHalfCarryFlag) {
+  LoadProgram({kSubBToA});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0x08U;
+  initials.A = 0x11U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(false);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x09U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, SubBToACarryAndHalfCarryFlag) {
+  LoadProgram({kSubBToA});
+
+  Registers initials = DefaultRegisters();
+  initials.B = 0x08U;
+  initials.A = 0x01U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(false);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(4, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0xF9U, cpu.GetRegisters().A);
+}
+
+TEST_F(CpuTest, SubAddressInHLToA) {
+  LoadProgram({kSubAddressInHLToA, 0x01});
+
+  Registers initials = DefaultRegisters();
+  initials.SetHL(kProgramStart + 1);
+  initials.A = 0x01U;
+  initials.SetFlagH(false);
+  initials.SetFlagC(false);
+  initials.SetFlagN(false);
+  initials.SetFlagZ(true);
+
+  Cpu cpu = MakeCpu(initials);
+
+  EXPECT_EQ(8, cpu.Step());
+  EXPECT_EQ(kProgramStart + 1, cpu.GetRegisters().PC);
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagH());
+  EXPECT_EQ(false, cpu.GetRegisters().GetFlagC());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagN());
+  EXPECT_EQ(true, cpu.GetRegisters().GetFlagZ());
+  EXPECT_EQ(0x0U, cpu.GetRegisters().A);
+  EXPECT_EQ(kProgramStart + 0x01U, cpu.GetRegisters().GetHL());
 }

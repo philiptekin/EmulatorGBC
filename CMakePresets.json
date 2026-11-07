@@ -30,7 +30,8 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_CXX_COMPILER": "/usr/bin/g++"
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "ENABLE_CLANG_TIDY": "OFF"
             }
         },
         {
@@ -41,7 +42,32 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_COMPILER": "/usr/bin/g++"
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "ENABLE_CLANG_TIDY": "OFF"
+            }
+        },
+        {
+            "name": "debug-clang-tidy",
+            "displayName": "Debug with clang-tidy",
+            "description": "Debug build using Ninja, GCC, and clang-tidy",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "ENABLE_CLANG_TIDY": "ON"
+            }
+        },
+        {
+            "name": "release-clang-tidy",
+            "displayName": "Release with clang-tidy",
+            "description": "Release build using Ninja, GCC, and clang-tidy",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "ENABLE_CLANG_TIDY": "ON"
             }
         }
     ],
@@ -53,6 +79,14 @@
         {
             "name": "release",
             "configurePreset": "release"
+        },
+        {
+            "name": "debug-clang-tidy",
+            "configurePreset": "debug-clang-tidy"
+        },
+        {
+            "name": "release-clang-tidy",
+            "configurePreset": "release-clang-tidy"
         }
     ],
     "workflowPresets": [
@@ -81,6 +115,34 @@
                 {
                     "type": "build",
                     "name": "release"
+                }
+            ]
+        },
+        {
+            "name": "debug-clang-tidy",
+            "displayName": "Debug with clang-tidy: Configure and Build",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "debug-clang-tidy"
+                },
+                {
+                    "type": "build",
+                    "name": "debug-clang-tidy"
+                }
+            ]
+        },
+        {
+            "name": "release-clang-tidy",
+            "displayName": "Release with clang-tidy: Configure and Build",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "release-clang-tidy"
+                },
+                {
+                    "type": "build",
+                    "name": "release-clang-tidy"
                 }
             ]
         }
