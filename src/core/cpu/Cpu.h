@@ -21,6 +21,9 @@ class Cpu {
 
  private:
   int32_t ExecuteBlock0(const uint8_t opcode);
+  int32_t ExecuteBlock1(const uint8_t opcode);
+  int32_t ExecuteBlock2(const uint8_t opcode);
+  int32_t ExecuteBlock3(const uint8_t opcode);
   core::memory::Bus& bus_;
   Registers registers_;
   bool stopped_ = false;
