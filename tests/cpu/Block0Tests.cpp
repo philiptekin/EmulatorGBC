@@ -1,43 +1,22 @@
-#include <gtest/gtest.h>
 #include <stdint.h>
 
-#include <cstdint>
-#include <initializer_list>
-
-#include "core/cpu/Cpu.h"
-#include "core/cpu/Registers.h"
-#include "core/memory/Bus.h"
-
-using core::cpu::Cpu;
-using core::cpu::Registers;
-using core::memory::Bus;
+#include "CpuTestFixture.h"
 
 namespace {
-
-constexpr uint16_t kProgramStart = 0xC000;
-constexpr uint16_t kDataAddress = kProgramStart + 0x20;
-constexpr uint16_t kSpDestination = kProgramStart + 0x100;
-
-// Block 0
 constexpr uint8_t kNop = 0x00;
-
 constexpr uint8_t kLdBcImmediate16 = 0x01;
 constexpr uint8_t kStoreAAtAddressInBc = 0x02;
 constexpr uint8_t kLoadAFromAddressInBc = 0x0A;
 constexpr uint8_t kStoreSpAtImmediateAddress = 0x08;
 constexpr uint8_t kStoreAAtAddressInHlThenIncrement = 0x22;
 constexpr uint8_t kStoreAAtAddressInHlThenDecrement = 0x32;
-
 constexpr uint8_t kIncrementBC = 0x3;
 constexpr uint8_t kDecrementBC = 0xB;
 constexpr uint8_t kAddHlWithValueOfBC = 0x9;
-
 constexpr uint8_t kIncrementB = 0x4;
 constexpr uint8_t kIncrementAtAddressInHL = 0x34;
-
 constexpr uint8_t kDecrementB = 0x5;
 constexpr uint8_t kDecrementAtAddressInHL = 0x35;
-
 constexpr uint8_t kStoreImmediate8AtB = 0x6;
 constexpr uint8_t kStoreImmediate8AtAddressInHl = 0x36;
 constexpr uint8_t kDaa = 0x27;
@@ -54,30 +33,9 @@ constexpr uint8_t kJrNz = 0x20;
 constexpr uint8_t kJrZ = 0x28;
 constexpr uint8_t kJrNc = 0x30;
 constexpr uint8_t kJrC = 0x38;
-
 }  // namespace
 
-class CpuTest : public ::testing::Test {
- protected:
-  static Registers DefaultRegisters() {
-    Registers registers{};
-    registers.PC = kProgramStart;
-    return registers;
-  }
-
-  Cpu MakeCpu(Registers registers = DefaultRegisters()) {
-    return Cpu(bus_, registers);
-  }
-
-  void LoadProgram(std::initializer_list<uint8_t> bytes) {
-    uint16_t address = kProgramStart;
-    for (const uint8_t byte : bytes) {
-      bus_.Write(address++, byte);
-    }
-  }
-
-  Bus bus_;
-};
+// Block 0
 
 TEST_F(CpuTest, NopConsumesFourTCyclesAndAdvancesPC) {
   LoadProgram({kNop});

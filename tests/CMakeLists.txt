@@ -5,7 +5,10 @@ add_executable(memory_tests
 )
 
 add_executable(cpu_tests
-    cpu/CpuTests.cpp
+    cpu/Block0Tests.cpp
+    cpu/Block1Tests.cpp
+    cpu/Block2Tests.cpp
+    cpu/Block3Tests.cpp
     cpu/RegistersTests.cpp
 )
 

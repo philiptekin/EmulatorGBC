@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "core/cpu/Registers.h"
 #include "core/memory/Bus.h"
 
 using namespace core::cpu;
@@ -24,28 +25,6 @@ int32_t NOP() {
   std::cout << "Executing NOP instruction." << "\n";
   return 4;  // NOP takes 4 T-cycles and 1 M-cycle on the Game Boy CPU.
 }
-int32_t LD_R16_IMM16(uint16_t& destination, uint16_t value) {
-  destination = value;
-  return 3;
-}
-
-int32_t LD_BC_n16(Registers& regs, uint16_t value) {
-  std::cout << "Executing LD BC, n16 instruction." << "\n";
-  regs.SetBC(value);
-  return 12;
-}
-
-int32_t LD_BC_A_IO(Bus& bus, Registers& regs) {
-  std::cout << "Executing [BC], A instruction" << "\n";
-  bus.Write(regs.GetBC() + 0xFF00, regs.A);
-  return 8;
-}
-
-int32_t INC_BC(Registers& regs) {
-  std::cout << "Executing INC BC" << "/n";
-  regs.SetBC(regs.GetBC() + 1);
-  return 8;
-}
 void Create_LD_BC_n16(Bus& bus, uint16_t address, uint16_t value) {
   const uint8_t high = static_cast<uint32_t>(value) >> 8U;
   const uint8_t low = value & 0xFFU;
@@ -57,15 +36,12 @@ void Create_LD_BC_n16(Bus& bus, uint16_t address, uint16_t value) {
 enum class Family : uint8_t {
   Block0 = 0x00,
   Block1 = 0x01,
-  Block2 = 0x10,
-  Block3 = 0x11
+  Block2 = 0x02,
+  Block3 = 0x03
 };
 
 enum class Instructions : uint8_t {
   NOP = 0x00,
-  LD_BC_n16 = 0x01,
-  LD_BC_A_IO = 0x02,
-  INC_BC = 0x03,
   HALT = 0x76,
 };
 enum class R8Operand : uint8_t {
@@ -80,6 +56,8 @@ enum class R8Operand : uint8_t {
 };
 
 enum class R16Pair : uint8_t { BC = 0, DE = 1, HL = 2, SP = 3 };
+
+enum class R16Stack : uint8_t { BC = 0, DE = 1, HL = 2, AF = 3 };
 
 enum class R16MemoryMode : uint8_t {
   BC = 0,
@@ -186,6 +164,42 @@ void WriteR16Pair(R16Pair pair, uint16_t value, Registers& registers) {
       return;
     case R16Pair::SP:
       registers.SP = value;
+      return;
+  }
+
+  throw std::invalid_argument("Invalid 16-bit pair" +
+                              std::to_string(static_cast<int32_t>(pair)));
+}
+
+uint16_t ReadR16Stack(R16Stack pair, const Registers& registers) {
+  switch (pair) {
+    case R16Stack::BC:
+      return registers.GetBC();
+    case R16Stack::DE:
+      return registers.GetDE();
+    case R16Stack::HL:
+      return registers.GetHL();
+    case R16Stack::AF:
+      return registers.GetAF();
+  }
+
+  throw std::invalid_argument("Invalid 16-bit pair" +
+                              std::to_string(static_cast<int32_t>(pair)));
+}
+
+void WriteR16Stack(R16Stack pair, uint16_t value, Registers& registers) {
+  switch (pair) {
+    case R16Stack::BC:
+      registers.SetBC(value);
+      return;
+    case R16Stack::DE:
+      registers.SetDE(value);
+      return;
+    case R16Stack::HL:
+      registers.SetHL(value);
+      return;
+    case R16Stack::AF:
+      registers.SetAF(value);
       return;
   }
 
@@ -430,7 +444,7 @@ int32_t Cpu::ExecuteBlock0(const uint8_t opcode) {
   if (opcode == 0x7) {
     // rlca is an instruction that rotates all bits in the register A to the
     // left, bit 7 gets put in the carry flag C and at bit 0.
-    const uint8_t bit7 = registers_.A >> 7;
+    const uint8_t bit7 = registers_.A >> 7U;
     registers_.SetFlagC(static_cast<bool>(bit7));
     registers_.SetFlagN(false);
     registers_.SetFlagZ(false);
@@ -438,7 +452,7 @@ int32_t Cpu::ExecuteBlock0(const uint8_t opcode) {
 
     // The idea is to reset bit 1 to 0 in register A and then we can safely
     // or the bit7 value.
-    registers_.A = registers_.A << 1;
+    registers_.A = registers_.A << 1U;
     registers_.A = static_cast<uint8_t>((registers_.A & ~0x1U)) | bit7;
     return 4;
   }
@@ -447,28 +461,30 @@ int32_t Cpu::ExecuteBlock0(const uint8_t opcode) {
   if (opcode == 0xF) {
     // rlca is an instruction that rotates all bits in the register A to the
     // right, bit 0 gets put in the carry flag C and at bit 7.
-    const uint8_t bit0 = registers_.A & 0x1;
+    const uint8_t bit0 = registers_.A & 0x1U;
     registers_.SetFlagC(static_cast<bool>(bit0));
     registers_.SetFlagN(false);
     registers_.SetFlagZ(false);
     registers_.SetFlagH(false);
 
-    registers_.A = registers_.A >> 1;
+    registers_.A = registers_.A >> 1U;
     // 0x80 = 2^7
     const uint8_t bit7Mask = 0x80U;
     registers_.A =
-        static_cast<uint8_t>((registers_.A & ~bit7Mask)) | (bit0 << 7);
+        static_cast<uint8_t>((registers_.A & static_cast<uint8_t>(~bit7Mask))) |
+        static_cast<uint8_t>(bit0 << 7U);
     return 4;
   }
+
   // rla
   if (opcode == 0x17) {
     // rla shifts register A to the left, bit 7 gets placed in flag C, flag C
     // gets placed in bit 0.
-    const uint8_t bit7 = registers_.A >> 7;
+    const uint8_t bit7 = registers_.A >> 7U;
 
     // The idea is to reset bit 1 to 0 in register A and then we can safely
     // or the bit7 value.
-    registers_.A = registers_.A << 1;
+    registers_.A = registers_.A << 1U;
     registers_.A = static_cast<uint8_t>((registers_.A & ~0x1U)) |
                    static_cast<uint8_t>(registers_.GetFlagC());
 
@@ -478,17 +494,20 @@ int32_t Cpu::ExecuteBlock0(const uint8_t opcode) {
     registers_.SetFlagH(false);
     return 4;
   }
+
   // rra
   if (opcode == 0x1F) {
     // rra shifts register A to the right, bit 0 gets placed in flag C, flag C
     // gets placed in bit 7.
-    const uint8_t bit0 = registers_.A & 0x1;
+    const uint8_t bit0 = registers_.A & 0x1U;
 
-    registers_.A = registers_.A >> 1;
+    registers_.A = registers_.A >> 1U;
     // 0x80 = 2^7
     const uint8_t bit7Mask = 0x80U;
-    registers_.A = static_cast<uint8_t>((registers_.A & ~bit7Mask)) |
-                   (static_cast<uint8_t>(registers_.GetFlagC()) << 7);
+    registers_.A =
+        static_cast<uint8_t>((registers_.A & static_cast<uint8_t>(~bit7Mask))) |
+        static_cast<uint8_t>(
+            (static_cast<uint8_t>(registers_.GetFlagC()) << 7U));
 
     registers_.SetFlagC(static_cast<bool>(bit0));
     registers_.SetFlagN(false);
@@ -496,6 +515,7 @@ int32_t Cpu::ExecuteBlock0(const uint8_t opcode) {
     registers_.SetFlagH(false);
     return 4;
   }
+
   // daa
   if (opcode == 0x27) {
     // daa or decimal adjust accumulator
@@ -586,8 +606,8 @@ int32_t Cpu::ExecuteBlock0(const uint8_t opcode) {
   }
 
   // jr cond, imm8
-  if (lastThree == 0x0 && (opcode >> 5) == 0x1) {
-    const uint8_t conditional = (opcode & 0x18) >> 3;
+  if (lastThree == 0x0 && ((static_cast<uint8_t>(opcode >> 5U) == 0x1U))) {
+    const uint8_t conditional = static_cast<uint8_t>(opcode & 0x18U) >> 3U;
     const bool isConditionMet =
         ReadConditionals(static_cast<Conditionals>(conditional), registers_);
     const int8_t immValue = static_cast<int8_t>(FetchByte(bus_, registers_));
@@ -606,8 +626,518 @@ int32_t Cpu::ExecuteBlock0(const uint8_t opcode) {
     return 8;
   }
 
-  throw std::invalid_argument("Unknows opcode for Block0: " +
+  throw std::invalid_argument("Unknown opcode for Block0: " +
                               std::to_string(opcode));
+}
+
+int32_t Cpu::ExecuteBlock1(const uint8_t opcode) {
+  // Implementation for Block1 instructions
+  // Halt
+  if (opcode == static_cast<uint8_t>(Instructions::HALT)) {
+    /*
+      halt is an instruction that pauses the CPU (during which less power is
+    consumed) when executed. The CPU wakes up as soon as an interrupt is
+    pending, that is, when the bitwise AND of IE and IF is non-zero.
+
+    Most commonly, IME is set. In this case, the CPU simply wakes up, and before
+    executing the instruction after the halt, the interrupt handler is called
+    normally.
+
+    If IME is not set, there are two distinct cases, depending on whether an
+    interrupt is pending as the halt instruction is first executed.
+
+    If no interrupt is pending, halt executes as normal, and the CPU resumes
+    regular execution as soon as an interrupt becomes pending. However, since
+    IME=0, the interrupt is not handled. If an interrupt is pending, halt
+    immediately exits, as expected, however the “halt bug”, explained below, is
+    triggered. halt bug When a halt instruction is executed with IME = 0 and
+    [IE] & [IF] != 0, the halt instruction ends immediately, but pc fails to be
+    normally incremented.
+
+    Under most circumstances, this causes the byte after the halt to be read a
+    second time (and this behaviour can repeat if said byte executes another
+    halt instruction). But, if the halt is immediately followed by a jump to
+    elsewhere, then the behaviour will be slightly different; this is possible
+    in only one of two ways:
+
+    The halt comes immediately after a ei instruction (whose effect is typically
+    delayed by one instruction, hence IME still being zero for the halt): the
+    interrupt is serviced and the handler called, but the interrupt returns to
+    the halt, which is executed again, and thus waits for another interrupt.
+    (Source) The halt is immediately followed by a rst instruction: the rst
+    instruction’s return address will point at the rst itself, instead of the
+    byte after it. Notably, a ret would return to the rst an execute it again.
+    If the bugged halt is preceded by a ei and followed by a rst, the former
+    “wins”.
+    */
+    std::cout << "Executing HALT instruction." << "\n";
+    return 4;
+  }
+  // ld r8, r8
+  const uint8_t sourceOperandValue = opcode & 0x7U;
+  const uint8_t destinationOperandValue = (opcode & 0x38U) >> 3U;
+  const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+  const R8Operand destinationOperand =
+      static_cast<R8Operand>(destinationOperandValue);
+  const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+  WriteR8Operand(destinationOperand, sourceValue, registers_, bus_);
+
+  if (sourceOperand == R8Operand::IndirectHL ||
+      destinationOperand == R8Operand::IndirectHL) {
+    return 8;
+  }
+
+  return 4;
+}
+
+int32_t Cpu::ExecuteBlock2(const uint8_t opcode) {
+  // Implementation for Block2 instructions
+
+  // add a, r8
+  if ((opcode & 0xF8U) == 0x80U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+
+    const uint32_t result = static_cast<uint32_t>(registers_.A) +
+                            static_cast<uint32_t>(sourceValue);
+    const uint8_t resultWrap = result & 0xFFU;
+
+    registers_.SetFlagZ(resultWrap == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(((registers_.A & 0xFU) + (sourceValue & 0xFU)) > 0xFU);
+    registers_.SetFlagC(result > 0xFFU);
+
+    registers_.A = resultWrap;
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  // adc a, r8
+  if ((opcode & 0xF8U) == 0x88U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+
+    const uint32_t result = static_cast<uint32_t>(registers_.A) +
+                            static_cast<uint32_t>(sourceValue) +
+                            static_cast<uint32_t>(registers_.GetFlagC());
+    const uint8_t resultWrap = result & 0xFFU;
+
+    registers_.SetFlagZ(resultWrap == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(((registers_.A & 0xFU) + (sourceValue & 0xFU) +
+                         static_cast<uint32_t>(registers_.GetFlagC())) > 0xFU);
+    registers_.SetFlagC(result > 0xFFU);
+
+    registers_.A = resultWrap;
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  // sub a, r8
+  if ((opcode & 0xF8U) == 0x90U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+
+    const uint32_t result = static_cast<uint32_t>(registers_.A) -
+                            static_cast<uint32_t>(sourceValue);
+    const uint8_t resultWrap = result & 0xFFU;
+
+    registers_.SetFlagZ(resultWrap == 0U);
+    registers_.SetFlagN(true);
+    registers_.SetFlagH(((registers_.A & 0xFU) < (sourceValue & 0xFU)));
+    registers_.SetFlagC(result > 0xFFU);
+
+    registers_.A = resultWrap;
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  // sbc a, r8
+  if ((opcode & 0xF8U) == 0x98U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+
+    const uint32_t result = static_cast<uint32_t>(registers_.A) -
+                            static_cast<uint32_t>(sourceValue) -
+                            static_cast<uint32_t>(registers_.GetFlagC());
+    const uint8_t resultWrap = result & 0xFFU;
+
+    registers_.SetFlagZ(resultWrap == 0U);
+    registers_.SetFlagN(true);
+    registers_.SetFlagH(
+        (registers_.A & 0xFU) <
+        ((sourceValue & 0xFU) + static_cast<uint32_t>(registers_.GetFlagC())));
+    registers_.SetFlagC(result > 0xFFU);
+
+    registers_.A = resultWrap;
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  // and a, r8
+  if ((opcode & 0xF8U) == 0xA0U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+
+    registers_.A &= sourceValue;
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(true);
+    registers_.SetFlagC(false);
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  // xor a, r8
+  if ((opcode & 0xF8U) == 0xA8U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+    registers_.A ^= sourceValue;
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(false);
+    registers_.SetFlagC(false);
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  // or a, r8
+  if ((opcode & 0xF8U) == 0xB0U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+
+    registers_.A |= sourceValue;
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(false);
+    registers_.SetFlagC(false);
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  // cp a, r8
+  if ((opcode & 0xF8U) == 0xB8U) {
+    const uint8_t sourceOperandValue = opcode & 0x7U;
+    const R8Operand sourceOperand = static_cast<R8Operand>(sourceOperandValue);
+    const uint8_t sourceValue = ReadR8Operand(sourceOperand, registers_, bus_);
+
+    const uint8_t result = registers_.A - sourceValue;
+    registers_.SetFlagZ(result == 0U);
+    registers_.SetFlagN(true);
+    registers_.SetFlagH((registers_.A & 0xFU) < (sourceValue & 0xFU));
+    registers_.SetFlagC(registers_.A < sourceValue);
+
+    if (sourceOperand == R8Operand::IndirectHL) {
+      return 8;
+    }
+    return 4;
+  }
+
+  throw std::invalid_argument("Unknown opcode for Block2: " +
+                              std::to_string(opcode));
+}
+
+int32_t Cpu::ExecuteBlock3(const uint8_t opcode) {
+  // Implementation for Block3 instructions
+  // add a, imm8
+  if (opcode == 0xC6) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    const uint8_t originalA = registers_.A;
+    const uint32_t result =
+        static_cast<uint32_t>(registers_.A) + static_cast<uint32_t>(immValue);
+    registers_.A = static_cast<uint8_t>(result & 0xFFU);
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(((originalA & 0xFU) + (immValue & 0xFU)) > 0xFU);
+    registers_.SetFlagC(result > 0xFFU);
+    return 8;
+  }
+
+  // adc a, imm8
+  if (opcode == 0xCE) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    const uint8_t originalA = registers_.A;
+    const uint32_t result = static_cast<uint32_t>(registers_.A) +
+                            static_cast<uint32_t>(immValue) +
+                            static_cast<uint32_t>(registers_.GetFlagC());
+    registers_.A = static_cast<uint8_t>(result & 0xFFU);
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(((originalA & 0xFU) + (immValue & 0xFU) +
+                         static_cast<uint32_t>(registers_.GetFlagC())) > 0xFU);
+    registers_.SetFlagC(result > 0xFFU);
+    return 8;
+  }
+
+  // sub a, imm8
+  if (opcode == 0xD6) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    const uint32_t result =
+        static_cast<uint32_t>(registers_.A) - static_cast<uint32_t>(immValue);
+    const uint8_t resultWrap = result & 0xFFU;
+
+    registers_.SetFlagZ(resultWrap == 0U);
+    registers_.SetFlagN(true);
+    registers_.SetFlagH(((registers_.A & 0xFU) < (immValue & 0xFU)));
+    registers_.SetFlagC(result > 0xFFU);
+
+    registers_.A = resultWrap;
+
+    return 8;
+  }
+
+  // sbc a, imm8
+  if (opcode == 0xDE) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    const uint32_t result = static_cast<uint32_t>(registers_.A) -
+                            static_cast<uint32_t>(immValue) -
+                            static_cast<uint32_t>(registers_.GetFlagC());
+    const uint8_t resultWrap = result & 0xFFU;
+
+    registers_.SetFlagZ(resultWrap == 0U);
+    registers_.SetFlagN(true);
+    registers_.SetFlagH(
+        ((registers_.A & 0xFU) <
+         ((immValue & 0xFU) + static_cast<uint32_t>(registers_.GetFlagC()))));
+    registers_.SetFlagC(result > 0xFFU);
+
+    registers_.A = resultWrap;
+
+    return 8;
+  }
+
+  // and a, imm8
+  if (opcode == 0xE6) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    registers_.A &= immValue;
+
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(true);
+    registers_.SetFlagC(false);
+
+    return 8;
+  }
+
+  // xor a, imm8
+  if (opcode == 0xEE) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    registers_.A ^= immValue;
+
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(false);
+    registers_.SetFlagC(false);
+    return 8;
+  }
+
+  // or a, imm8
+  if (opcode == 0xF6) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    registers_.A |= immValue;
+
+    registers_.SetFlagZ(registers_.A == 0U);
+    registers_.SetFlagN(false);
+    registers_.SetFlagH(false);
+    registers_.SetFlagC(false);
+    return 8;
+  }
+
+  // cp a, imm8
+  if (opcode == 0xFE) {
+    const uint8_t immValue = FetchByte(bus_, registers_);
+    const uint32_t result =
+        static_cast<uint32_t>(registers_.A) - static_cast<uint32_t>(immValue);
+
+    registers_.SetFlagZ(result == 0U);
+    registers_.SetFlagN(true);
+    registers_.SetFlagH((registers_.A & 0xFU) < (immValue & 0xFU));
+    registers_.SetFlagC(immValue > registers_.A);
+
+    return 8;
+  }
+
+  const uint8_t secondTableOpcodes = static_cast<uint8_t>(opcode & 0xE7U);
+
+  // ret cond
+  if (secondTableOpcodes == 0xC0) {
+    const uint8_t conditional = static_cast<uint8_t>(opcode & 0x18U) >> 3U;
+    const bool isConditionMet =
+        ReadConditionals(static_cast<Conditionals>(conditional), registers_);
+    if (isConditionMet) {
+      const uint8_t low = bus_.Read(registers_.SP);
+      registers_.SP++;
+      const uint8_t high = bus_.Read(registers_.SP);
+      registers_.SP++;
+
+      registers_.PC =
+          static_cast<uint16_t>((static_cast<uint16_t>(high) << 8U) | low);
+      return 20;
+    }
+    return 8;
+  }
+
+  // ret
+  if (opcode == 0xC9) {
+    const uint8_t low = bus_.Read(registers_.SP);
+    registers_.SP++;
+    const uint8_t high = bus_.Read(registers_.SP);
+    registers_.SP++;
+
+    registers_.PC =
+        static_cast<uint16_t>((static_cast<uint16_t>(high) << 8U) | low);
+    return 16;
+  }
+
+  // reti
+  if (opcode == 0xD9) {
+    const uint8_t low = bus_.Read(registers_.SP);
+    registers_.SP++;
+    const uint8_t high = bus_.Read(registers_.SP);
+    registers_.SP++;
+
+    registers_.PC =
+        static_cast<uint16_t>((static_cast<uint16_t>(high) << 8U) | low);
+
+    ime_ = true;
+    return 16;
+  }
+
+  // jp cond, imm16
+  if (secondTableOpcodes == 0xC2) {
+    const uint8_t low = FetchByte(bus_, registers_);
+    const uint8_t high = FetchByte(bus_, registers_);
+    const uint8_t conditional = static_cast<uint8_t>(opcode & 0x18U) >> 3U;
+    const bool isConditionMet =
+        ReadConditionals(static_cast<Conditionals>(conditional), registers_);
+    if (isConditionMet) {
+      registers_.PC =
+          static_cast<uint16_t>((static_cast<uint16_t>(high) << 8U) | low);
+      return 16;
+    }
+    return 12;
+  }
+
+  // jp imm16
+  if (opcode == 0xC3) {
+    const uint8_t low = FetchByte(bus_, registers_);
+    const uint8_t high = FetchByte(bus_, registers_);
+    registers_.PC =
+        static_cast<uint16_t>((static_cast<uint16_t>(high) << 8U) | low);
+    return 16;
+  }
+
+  // jp hl
+  if (opcode == 0xE9) {
+    registers_.PC = registers_.GetHL();
+    return 4;
+  }
+
+  // call cond, imm16
+  if (secondTableOpcodes == 0xC4) {
+    const uint8_t low = FetchByte(bus_, registers_);
+    const uint8_t high = FetchByte(bus_, registers_);
+    const uint8_t conditional = static_cast<uint8_t>(opcode & 0x18U) >> 3U;
+    const bool isConditionMet =
+        ReadConditionals(static_cast<Conditionals>(conditional), registers_);
+    if (isConditionMet) {
+      const uint16_t returnAddress = registers_.PC;
+      registers_.SP--;
+      bus_.Write(registers_.SP, static_cast<uint8_t>(returnAddress >> 8U));
+      registers_.SP--;
+      bus_.Write(registers_.SP, static_cast<uint8_t>(returnAddress & 0xFFU));
+      registers_.PC =
+          static_cast<uint16_t>((static_cast<uint16_t>(high) << 8U) | low);
+      return 24;
+    }
+    return 12;
+  }
+
+  // call imm16
+  if (opcode == 0xCD) {
+    const uint8_t low = FetchByte(bus_, registers_);
+    const uint8_t high = FetchByte(bus_, registers_);
+    const uint16_t returnAddress = registers_.PC;
+    registers_.SP--;
+    bus_.Write(registers_.SP, static_cast<uint8_t>(returnAddress >> 8U));
+    registers_.SP--;
+    bus_.Write(registers_.SP, static_cast<uint8_t>(returnAddress & 0xFFU));
+    registers_.PC =
+        static_cast<uint16_t>((static_cast<uint16_t>(high) << 8U) | low);
+    return 24;
+  }
+
+  // rst tgt3
+  if ((static_cast<uint8_t>(opcode & 0xC7U) == 0xC7U)) {
+    const uint16_t target = static_cast<uint8_t>(opcode & 0x38U);
+    registers_.SP--;
+    bus_.Write(registers_.SP,
+               static_cast<uint8_t>((registers_.PC) >> 8) & 0xFF);
+    registers_.SP--;
+    bus_.Write(registers_.SP, static_cast<uint8_t>(registers_.PC) & 0xFF);
+    registers_.PC = target;
+    return 16;
+  }
+
+  // pop r16stk
+  if ((static_cast<uint8_t>(opcode & 0xC7U) == 0xC1U)) {
+    const uint8_t low = bus_.Read(registers_.SP);
+    registers_.SP++;
+    const uint8_t high = bus_.Read(registers_.SP);
+    registers_.SP++;
+
+    const uint8_t registerToSet = static_cast<uint8_t>((opcode >> 4U) & 0x3U);
+    const uint16_t value = static_cast<uint16_t>(
+        static_cast<int32_t>(high) << 8 | static_cast<int32_t>(low));
+    WriteR16Stack(static_cast<R16Stack>(registerToSet), value, registers_);
+
+    return 12;
+  }
+
+  // push r16stk
+  if ((static_cast<uint8_t>(opcode & 0xC7U) == 0xC5U)) {
+    const uint8_t registerToSet = static_cast<uint8_t>((opcode >> 4U) & 0x3U);
+
+    const uint16_t value =
+        ReadR16Stack(static_cast<R16Stack>(registerToSet), registers_);
+    registers_.SP--;
+    bus_.Write(registers_.SP, static_cast<uint8_t>(value >> 8U));
+    registers_.SP--;
+    bus_.Write(registers_.SP, static_cast<uint8_t>(value & 0xFFU));
+    return 16;
+  }
+
+  // For now, just print the opcode and return a default cycle count
+  std::cout << "Executing Block3 opcode: " << static_cast<int>(opcode) << "\n";
+  return 4;  // Example: assume each instruction takes 4 cycles
 }
 
 void Cpu::Initialize() {
@@ -632,7 +1162,7 @@ int32_t Cpu::Step() {
 
   // Decode and execute the instruction based on the opcode
   // For simplicity, let's just print the opcode for now
-  std::cout << "Executing opcode: " << static_cast<int>(opcode) << "\n";
+  std::cout << "Executing opcode: " << static_cast<int32_t>(opcode) << "\n";
 
   // Determine family
   const uint8_t familyType = opcode >> 6U;
@@ -643,37 +1173,26 @@ int32_t Cpu::Step() {
   }
 
   // Block 1
-  if (familyType == static_cast<uint8_t>(Family::Block1) &&
-      opcode != static_cast<uint8_t>(Instructions::HALT)) {
+  if (familyType == static_cast<uint8_t>(Family::Block1)) {
+    return ExecuteBlock1(opcode);
   }
 
   // Block 2
   if (familyType == static_cast<uint8_t>(Family::Block2)) {
+    return ExecuteBlock2(opcode);
   }
 
   // Block 3
   if (familyType == static_cast<uint8_t>(Family::Block3)) {
+    return ExecuteBlock3(opcode);
   }
 
-  switch (opcode) {
-    case static_cast<uint8_t>(Instructions::LD_BC_n16): {
-      const uint8_t low = FetchByte(bus_, registers_);
-      const uint8_t high = FetchByte(bus_, registers_);
-      const uint16_t immediateValue =
-          static_cast<uint16_t>(static_cast<uint32_t>(high) << 8U) |
-          static_cast<uint16_t>(low);
-      return LD_BC_n16(registers_, immediateValue);
-    }
-    case static_cast<uint8_t>(Instructions::LD_BC_A_IO): {
-      return LD_BC_A_IO(bus_, registers_);
-    }
-    case static_cast<uint8_t>(Instructions::INC_BC):
-      return INC_BC(registers_);
-    default: {
-      std::cerr << "Unhandled opcode: " << static_cast<int>(opcode) << "\n";
-      return 4;  // Example: assume each instruction takes 4 cycles
-    }
-  }
+  std::cerr << "Unhandled opcode: " << static_cast<int>(opcode) << "\n";
+  return 4;  // Example: assume each instruction takes 4 cycles
 }
 
 const Registers& Cpu::GetRegisters() const { return registers_; }
+
+void Cpu::SetIme(bool set) { ime_ = set; }
+
+bool Cpu::GetIme() const { return ime_; }

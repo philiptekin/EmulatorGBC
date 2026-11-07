@@ -111,3 +111,42 @@ TEST(RegistersTest, GetAllFlagsReturnsMixedValues) {
   EXPECT_EQ(1, registers.GetFlagH());
   EXPECT_EQ(0, registers.GetFlagC());
 }
+
+TEST(RegistersTest, SetAllFlagsReturnsSetValues) {
+  Registers registers;
+  registers.SetFlagH(true);
+  registers.SetFlagC(true);
+  registers.SetFlagN(true);
+  registers.SetFlagZ(true);
+
+  EXPECT_EQ(1, registers.GetFlagZ());
+  EXPECT_EQ(1, registers.GetFlagN());
+  EXPECT_EQ(1, registers.GetFlagH());
+  EXPECT_EQ(1, registers.GetFlagC());
+}
+
+TEST(RegistersTest, SetAllFlagsReturnsClearValuesWhenUnset) {
+  Registers registers;
+  registers.SetFlagC(false);
+  registers.SetFlagH(false);
+  registers.SetFlagZ(false);
+  registers.SetFlagN(false);
+
+  EXPECT_EQ(0, registers.GetFlagZ());
+  EXPECT_EQ(0, registers.GetFlagN());
+  EXPECT_EQ(0, registers.GetFlagH());
+  EXPECT_EQ(0, registers.GetFlagC());
+}
+
+TEST(RegistersTest, SetAllFlagsReturnsMixedValues) {
+  Registers registers;
+  registers.SetFlagH(true);
+  registers.SetFlagC(false);
+  registers.SetFlagN(false);
+  registers.SetFlagZ(true);
+
+  EXPECT_EQ(1, registers.GetFlagZ());
+  EXPECT_EQ(0, registers.GetFlagN());
+  EXPECT_EQ(1, registers.GetFlagH());
+  EXPECT_EQ(0, registers.GetFlagC());
+}
